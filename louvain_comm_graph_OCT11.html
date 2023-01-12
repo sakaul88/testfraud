@@ -1,0 +1,298 @@
+<html>
+    <head>
+        <meta charset="utf-8">
+        
+            <script src="lib/bindings/utils.js"></script>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/dist/vis-network.min.css" integrity="sha512-WgxfT5LWjfszlPHXRmBWHkV2eceiWTOBvrKCNbdgDYTHrT2AeLCGbF4sZlZw3UMN3WtL0tGUoIAKsu8mllg/XA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js" integrity="sha512-LnvoEWDFrqGHlHmDD2101OrLcbsfkrzoSpvtSQtxK3RMnRV0eOkhhBN2dXHKRrUU8p2DGRTk35n4O8nWSVe1mQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+            
+                <link href="lib/tom-select/tom-select.css" rel="stylesheet">
+                <script src="lib/tom-select/tom-select.complete.min.js"></script>
+            
+        
+<center>
+<h1></h1>
+</center>
+
+<!-- <link rel="stylesheet" href="../node_modules/vis/dist/vis.min.css" type="text/css" />
+<script type="text/javascript" src="../node_modules/vis/dist/vis.js"> </script>-->
+        <link
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/css/bootstrap.min.css"
+          rel="stylesheet"
+          integrity="sha384-eOJMYsd53ii+scO/bJGFsiCZc+5NDVN2yr8+0RDqr0Ql0h+rP48ckxlpbzKgwra6"
+          crossorigin="anonymous"
+        />
+        <script
+          src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/js/bootstrap.bundle.min.js"
+          integrity="sha384-JEW9xMcG8R+pH31jmWH6WWP0WintQrMb4s7ZOdauHnUtxwoG2vI5DkLtS3qm9Ekf"
+          crossorigin="anonymous"
+        ></script>
+
+
+        <center>
+          <h1></h1>
+        </center>
+        <style type="text/css">
+
+             #mynetwork {
+                 width: 100%;
+                 height: 500px;
+                 background-color: #ffffff;
+                 border: 1px solid lightgray;
+                 position: relative;
+                 float: left;
+             }
+
+             
+
+             
+
+             
+        </style>
+    </head>
+
+
+    <body>
+        <div class="card" style="width: 100%">
+            
+            
+              <div id="filter-menu" class="card-header">
+                <div class="row no-gutters">
+                  <div class="col-3 pb-2">
+                    <select
+                            class="form-select"
+                            aria-label="Default select example"
+                            onchange="updateFilter(value, 'item')"
+                            id="select-item"
+                        >
+                        <option value="">Select a network item</option>
+                        <option value="edge">edge</option>
+                        <option value="node">node</option>
+                    </select>
+                  </div>
+                  <div class="col-3 pb-2">
+                    <select
+                            class="form-select"
+                            aria-label="Default select example"
+                            onchange="updateFilter(value, 'property')"
+                            id="select-property"
+                        >
+                        <option value="">Select a property...</option>
+                    </select>
+                  </div>
+                  <div class="col-3 pb-2">
+                    <select
+                            class="form-select"
+                            aria-label="Default select example"
+                            id="select-value"
+                        >
+                        <option value="">Select value(s)...</option>
+                    </select>
+                  </div>
+                  <div class="col-1 pb-2">
+                    <button type="button" class="btn btn-primary btn-block" onclick="highlightFilter(filter);">Filter</button>
+                  </div>
+                  <div class="col-2 pb-2">
+                    <button type="button" class="btn btn-primary btn-block" onclick="clearFilter(true)">Reset Selection</button>
+                  </div>
+                </div>
+              </div>
+            
+            <div id="mynetwork" class="card-body"></div>
+        </div>
+
+        
+        
+
+        <script type="text/javascript">
+
+              // initialize global variables.
+              var edges;
+              var nodes;
+              var allNodes;
+              var allEdges;
+              var nodeColors;
+              var originalNodes;
+              var network;
+              var container;
+              var options, data;
+              var filter = {
+                  item : '',
+                  property : '',
+                  value : []
+              };
+
+              
+
+              
+                  // explicitly using onItemAdd and this function as we need to save multiple values
+                  let updateValueFilter = function() {
+                      return function () {
+                      filter['value'].push(arguments[0])
+                      }
+                  }
+
+                  let valueControl = new TomSelect("#select-value",{
+                      maxItems: null,
+                      valueField: 'id',
+                      labelField: 'title',
+                      searchField: 'title',
+                      create: false,
+                      sortField: {
+                          field: "text",
+                          direction: "asc"
+                      },
+                      onItemAdd: updateValueFilter()
+                  });
+
+                  let addValues = function() {
+                      return function () {
+                          // clear the current value options and add the selected attribute values
+                          // tom-select handles duplicates
+                          let selectedProperty = arguments[0];
+                          valueControl.clear();
+                          valueControl.clearOptions();
+                          filter['value'] = []
+                          if (filter['item'] === 'node') {
+                              for (let each in allNodes) {
+                                  valueControl.addOption({
+                                      id:allNodes[each][selectedProperty],
+                                      title:allNodes[each][selectedProperty]
+                                  })
+                              }
+                          }
+                          else if (filter['item'] === 'edge') {
+                              for (let each in allEdges) {
+                                  valueControl.addOption({
+                                      id:allEdges[each][selectedProperty],
+                                      title:allEdges[each][selectedProperty]
+                                  })
+                              }
+                          }
+                      }
+                  };
+
+                  let propControl = new TomSelect("#select-property",{
+                      valueField: 'id',
+                      labelField: 'title',
+                      searchField: 'title',
+                      create: false,
+                      sortField: {
+                          field: "text",
+                          direction: "asc"
+                      },
+                      onItemAdd: addValues()
+                  });
+
+                  let addProperties = function() {
+                      return function () {
+                          // loops through the selected network item and adds the attributes to dropdown
+                          // tom-select handles duplicates
+                          clearFilter(false)
+                          if (arguments[0] === 'edge') {
+                              for (let each in allEdges) {
+                                  if (allEdges.hasOwnProperty(each)) {
+                                      for (let eachProp in allEdges[each]) {
+                                          if (allEdges[each].hasOwnProperty(eachProp)) {
+                                              propControl.addOption({id: eachProp, title: eachProp})
+                                          }
+                                      }
+                                  }
+                              }
+                          }
+                          else if (arguments[0] === 'node') {
+                              for (let each in allNodes) {
+                                  if (allNodes.hasOwnProperty(each)) {
+                                      for (let eachProp in allNodes[each]) {
+                                          if (allNodes[each].hasOwnProperty(eachProp)
+                                              && (eachProp !== 'hidden' && eachProp !== 'savedLabel'
+                                                  && eachProp !== 'hiddenLabel')) {
+                                              propControl.addOption({id: eachProp, title: eachProp})
+
+                                          }
+                                      }
+                                  }
+                              }
+                          }
+                      }
+                  };
+
+                  let itemControl = new TomSelect("#select-item",{
+                      create: false,
+                      sortField:{
+                          field: "text",
+                          direction: "asc"
+                      },
+                      onItemAdd: addProperties()
+                  });
+
+                  function clearFilter(reset) {
+                      // utility function to clear all the selected filter options
+                      // if reset is set to true, the existing filter will be removed
+                      // else, only the dropdown options are cleared
+                      propControl.clear();
+                      propControl.clearOptions();
+                      valueControl.clear();
+                      valueControl.clearOptions();
+                      filter = {
+                          item : '',
+                          property : '',
+                          value : []
+                      }
+                      if (reset) {
+                          itemControl.clear();
+                          filterHighlight({nodes: []})
+                      }
+                  }
+
+                  function updateFilter(value, key) {
+                      // key could be 'item' or 'property' and value is as selected in dropdown
+                      filter[key] = value
+                  }
+
+              
+
+              // This method is responsible for drawing the graph, returns the drawn network
+              function drawGraph() {
+                  var container = document.getElementById('mynetwork');
+
+                  
+
+                  // parsing and collecting nodes and edges from the python
+                  nodes = new vis.DataSet([{"color": "red", "id": "93323328", "label": "Community ID: 93323328\nFraud Penetration(%): 26.56", "shape": "star", "size": 270}, {"color": "#e75900", "id": "68157465", "label": "Community ID: 68157465\nFraud Penetration(%): 5.71", "shape": "star", "size": 220}, {"color": "#d70", "id": "68157518", "label": "Community ID: 68157518\nFraud Penetration(%): 2.8", "shape": "star", "size": 200}, {"color": "#d88500", "id": "71303259", "label": "Community ID: 71303259\nFraud Penetration(%): 2.57", "shape": "star", "size": 190}, {"color": "#67a700", "id": "71303307", "label": "Community ID: 71303307\nFraud Penetration(%): 0.07", "shape": "star", "size": 90}, {"color": "#f52600", "id": "74448923", "label": "Community ID: 74448923\nFraud Penetration(%): 14.43", "shape": "star", "size": 250}, {"color": "#2d9400", "id": "75497620", "label": "Community ID: 75497620\nFraud Penetration(%): 0.02", "shape": "star", "size": 50}, {"color": "#158a00", "id": "78643356", "label": "Community ID: 78643356\nFraud Penetration(%): 0.01", "shape": "star", "size": 30}, {"color": "#3b9800", "id": "79691936", "label": "Community ID: 79691936\nFraud Penetration(%): 0.04", "shape": "star", "size": 60}, {"color": "#218f00", "id": "82837652", "label": "Community ID: 82837652\nFraud Penetration(%): 0.02", "shape": "star", "size": 40}, {"color": "#e26800", "id": "82837677", "label": "Community ID: 82837677\nFraud Penetration(%): 4.19", "shape": "star", "size": 210}, {"color": "#f03700", "id": "83886186", "label": "Community ID: 83886186\nFraud Penetration(%): 10.23", "shape": "star", "size": 240}, {"color": "#c9aa00", "id": "84934794", "label": "Community ID: 84934794\nFraud Penetration(%): 1.0", "shape": "star", "size": 160}, {"color": "green", "id": "85983275", "label": "Community ID: 85983275\nFraud Penetration(%): 0.0", "shape": "star", "size": 10}, {"color": "#d39200", "id": "87031896", "label": "Community ID: 87031896\nFraud Penetration(%): 1.64", "shape": "star", "size": 180}, {"color": "#499d00", "id": "87031900", "label": "Community ID: 87031900\nFraud Penetration(%): 0.04", "shape": "star", "size": 70}, {"color": "#bfbf00", "id": "87031918", "label": "Community ID: 87031918\nFraud Penetration(%): 0.49", "shape": "star", "size": 140}, {"color": "#c4b500", "id": "88080428", "label": "Community ID: 88080428\nFraud Penetration(%): 0.65", "shape": "star", "size": 150}, {"color": "#eb4800", "id": "88080494", "label": "Community ID: 88080494\nFraud Penetration(%): 7.47", "shape": "star", "size": 230}, {"color": "#ce9f00", "id": "88080500", "label": "Community ID: 88080500\nFraud Penetration(%): 1.21", "shape": "star", "size": 170}, {"color": "#77ac00", "id": "88080502", "label": "Community ID: 88080502\nFraud Penetration(%): 0.13", "shape": "star", "size": 100}, {"color": "#fa1300", "id": "90177575", "label": "Community ID: 90177575\nFraud Penetration(%): 20.27", "shape": "star", "size": 260}, {"color": "#0a8500", "id": "90177720", "label": "Community ID: 90177720\nFraud Penetration(%): 0.01", "shape": "star", "size": 20}, {"color": "#57a200", "id": "92274784", "label": "Community ID: 92274784\nFraud Penetration(%): 0.04", "shape": "star", "size": 80}, {"color": "#acbb00", "id": "96469034", "label": "Community ID: 96469034\nFraud Penetration(%): 0.49", "shape": "star", "size": 130}, {"color": "#88b100", "id": "99614734", "label": "Community ID: 99614734\nFraud Penetration(%): 0.18", "shape": "star", "size": 110}, {"color": "#9ab600", "id": "98566211", "label": "Community ID: 98566211\nFraud Penetration(%): 0.31", "shape": "star", "size": 120}]);
+                  edges = new vis.DataSet([{"arrows": "to", "from": "93323328", "label": "Transaction count: 99992", "to": "68157465", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 48012", "to": "68157518", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 41780", "to": "71303259", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 1393", "to": "71303307", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 234458", "to": "74448923", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 507", "to": "75497620", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 536", "to": "78643356", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 285", "to": "79691936", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 272", "to": "82837652", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 66199", "to": "82837677", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 174121", "to": "83886186", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 20006", "to": "84934794", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 294", "to": "85983275", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 27383", "to": "87031896", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 549", "to": "87031900", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 7821", "to": "87031918", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 10099", "to": "88080428", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 128767", "to": "88080494", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 16573", "to": "88080500", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 2200", "to": "88080502", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 339857", "to": "90177575", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 544", "to": "90177720", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 1112", "to": "92274784", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 445197", "to": "93323328", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 7814", "to": "96469034", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 3309", "to": "99614734", "width": 1}, {"arrows": "to", "from": "93323328", "label": "Transaction count: 3193", "to": "98566211", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 76156", "to": "68157465", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 36522", "to": "68157518", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 32269", "to": "71303259", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 1059", "to": "71303307", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 178978", "to": "74448923", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 379", "to": "75497620", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 400", "to": "78643356", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 238", "to": "79691936", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 219", "to": "82837652", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 50534", "to": "82837677", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 133614", "to": "83886186", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 15425", "to": "84934794", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 213", "to": "85983275", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 21028", "to": "87031896", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 409", "to": "87031900", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 5931", "to": "87031918", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 7618", "to": "88080428", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 98437", "to": "88080494", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 12569", "to": "88080500", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 1737", "to": "88080502", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 261870", "to": "90177575", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 5986", "to": "96469034", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 2512", "to": "99614734", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 2377", "to": "98566211", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 876", "to": "92274784", "width": 1}, {"arrows": "to", "from": "90177575", "label": "Transaction count: 431", "to": "90177720", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 52670", "to": "68157465", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 25266", "to": "68157518", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 21844", "to": "71303259", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 769", "to": "71303307", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 123681", "to": "74448923", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 91749", "to": "83886186", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 67590", "to": "88080494", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 34648", "to": "82837677", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 14395", "to": "87031896", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 10667", "to": "84934794", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 8747", "to": "88080500", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 5456", "to": "88080428", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 4116", "to": "96469034", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 4153", "to": "87031918", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 1810", "to": "99614734", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 1666", "to": "98566211", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 1186", "to": "88080502", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 597", "to": "92274784", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 302", "to": "90177720", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 281", "to": "78643356", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 272", "to": "75497620", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 306", "to": "87031900", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 156", "to": "82837652", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 164", "to": "85983275", "width": 1}, {"arrows": "to", "from": "74448923", "label": "Transaction count: 163", "to": "79691936", "width": 1}, {"arrows": "to", "from": "83886186", "label": "Transaction count: 39021", "to": "68157465", "width": 1}, {"arrows": "to", "from": "83886186", "label": "Transaction count: 18957", "to": "68157518", "width": 1}, {"arrows": "to", "from": "83886186", "label": "Transaction count: 16587", "to": "71303259", "width": 1}, {"arrows": "to", "from": "83886186", "label": "Transaction count: 568", "to": "71303307", "width": 1}, {"arrows": "to", "from": "83886186", "label": "Transaction count: 217", "to": "75497620", "width": 1}, {"arrows": "to", "from": "83886186", "label": "Transaction count: 221", "to": "78643356", "width": 1}, {"arrows": "to", "from": "83886186", "label": "Transaction count: 107", "to": "79691936", "width": 1}, {"arrows": "to", "from": "83886186", "label": "Transaction count: 93", "to": "82837652", "width": 1}, {"arrows": "to", "from": "83886186", "label": "Transaction count: 25525", "to": "82837677", "width": 1}, {"arrows": "to", "from": "83886186", "label": "Transaction count: 69133", "to": "83886186", "width": 1}, {"arrows": "to", "from": "83886186", "label": "Transaction count: 50169", "to": "88080494", "width": 1}, {"arrows": "to", "from": "83886186", "label": "Transaction count: 10697", "to": "87031896", "width": 1}, {"arrows": "to", "from": "83886186", "label": "Transaction count: 7892", "to": "84934794", "width": 1}, {"arrows": "to", "from": "83886186", "label": "Transaction count: 6522", "to": "88080500", "width": 1}, {"arrows": "to", "from": "83886186", "label": "Transaction count: 3859", "to": "88080428", "width": 1}, {"arrows": "to", "from": "83886186", "label": "Transaction count: 3096", "to": "87031918", "width": 1}, {"arrows": "to", "from": "83886186", "label": "Transaction count: 3123", "to": "96469034", "width": 1}, {"arrows": "to", "from": "83886186", "label": "Transaction count: 1265", "to": "99614734", "width": 1}, {"arrows": "to", "from": "83886186", "label": "Transaction count: 1171", "to": "98566211", "width": 1}, {"arrows": "to", "from": "83886186", "label": "Transaction count: 887", "to": "88080502", "width": 1}, {"arrows": "to", "from": "83886186", "label": "Transaction count: 445", "to": "92274784", "width": 1}, {"arrows": "to", "from": "83886186", "label": "Transaction count: 198", "to": "87031900", "width": 1}, {"arrows": "to", "from": "83886186", "label": "Transaction count: 217", "to": "90177720", "width": 1}, {"arrows": "to", "from": "83886186", "label": "Transaction count: 124", "to": "85983275", "width": 1}, {"arrows": "to", "from": "88080494", "label": "Transaction count: 29025", "to": "68157465", "width": 1}, {"arrows": "to", "from": "88080494", "label": "Transaction count: 13832", "to": "68157518", "width": 1}, {"arrows": "to", "from": "88080494", "label": "Transaction count: 12039", "to": "71303259", "width": 1}, {"arrows": "to", "from": "88080494", "label": "Transaction count: 376", "to": "71303307", "width": 1}, {"arrows": "to", "from": "88080494", "label": "Transaction count: 162", "to": "75497620", "width": 1}, {"arrows": "to", "from": "88080494", "label": "Transaction count: 130", "to": "78643356", "width": 1}, {"arrows": "to", "from": "88080494", "label": "Transaction count: 85", "to": "79691936", "width": 1}, {"arrows": "to", "from": "88080494", "label": "Transaction count: 76", "to": "82837652", "width": 1}, {"arrows": "to", "from": "88080494", "label": "Transaction count: 19198", "to": "82837677", "width": 1}, {"arrows": "to", "from": "88080494", "label": "Transaction count: 5641", "to": "84934794", "width": 1}, {"arrows": "to", "from": "88080494", "label": "Transaction count: 75", "to": "85983275", "width": 1}, {"arrows": "to", "from": "88080494", "label": "Transaction count: 7866", "to": "87031896", "width": 1}, {"arrows": "to", "from": "88080494", "label": "Transaction count: 149", "to": "87031900", "width": 1}, {"arrows": "to", "from": "88080494", "label": "Transaction count: 2317", "to": "87031918", "width": 1}, {"arrows": "to", "from": "88080494", "label": "Transaction count: 2983", "to": "88080428", "width": 1}, {"arrows": "to", "from": "88080494", "label": "Transaction count: 37865", "to": "88080494", "width": 1}, {"arrows": "to", "from": "88080494", "label": "Transaction count: 4765", "to": "88080500", "width": 1}, {"arrows": "to", "from": "88080494", "label": "Transaction count: 2314", "to": "96469034", "width": 1}, {"arrows": "to", "from": "88080494", "label": "Transaction count: 866", "to": "98566211", "width": 1}, {"arrows": "to", "from": "88080494", "label": "Transaction count: 950", "to": "99614734", "width": 1}, {"arrows": "to", "from": "88080494", "label": "Transaction count: 649", "to": "88080502", "width": 1}, {"arrows": "to", "from": "88080494", "label": "Transaction count: 317", "to": "92274784", "width": 1}, {"arrows": "to", "from": "88080494", "label": "Transaction count: 168", "to": "90177720", "width": 1}, {"arrows": "to", "from": "68157465", "label": "Transaction count: 22830", "to": "68157465", "width": 1}, {"arrows": "to", "from": "68157465", "label": "Transaction count: 14941", "to": "82837677", "width": 1}, {"arrows": "to", "from": "68157465", "label": "Transaction count: 10812", "to": "68157518", "width": 1}, {"arrows": "to", "from": "68157465", "label": "Transaction count: 9289", "to": "71303259", "width": 1}, {"arrows": "to", "from": "68157465", "label": "Transaction count: 6330", "to": "87031896", "width": 1}, {"arrows": "to", "from": "68157465", "label": "Transaction count: 4561", "to": "84934794", "width": 1}, {"arrows": "to", "from": "68157465", "label": "Transaction count: 3749", "to": "88080500", "width": 1}, {"arrows": "to", "from": "68157465", "label": "Transaction count: 2185", "to": "88080428", "width": 1}, {"arrows": "to", "from": "68157465", "label": "Transaction count: 1712", "to": "87031918", "width": 1}, {"arrows": "to", "from": "68157465", "label": "Transaction count: 1770", "to": "96469034", "width": 1}, {"arrows": "to", "from": "68157465", "label": "Transaction count: 762", "to": "99614734", "width": 1}, {"arrows": "to", "from": "68157465", "label": "Transaction count: 659", "to": "98566211", "width": 1}, {"arrows": "to", "from": "68157465", "label": "Transaction count: 508", "to": "88080502", "width": 1}, {"arrows": "to", "from": "68157465", "label": "Transaction count: 310", "to": "71303307", "width": 1}, {"arrows": "to", "from": "68157465", "label": "Transaction count: 250", "to": "92274784", "width": 1}, {"arrows": "to", "from": "68157465", "label": "Transaction count: 123", "to": "75497620", "width": 1}, {"arrows": "to", "from": "68157465", "label": "Transaction count: 126", "to": "90177720", "width": 1}, {"arrows": "to", "from": "68157465", "label": "Transaction count: 141", "to": "78643356", "width": 1}, {"arrows": "to", "from": "68157465", "label": "Transaction count: 126", "to": "87031900", "width": 1}, {"arrows": "to", "from": "68157465", "label": "Transaction count: 60", "to": "82837652", "width": 1}, {"arrows": "to", "from": "68157465", "label": "Transaction count: 68", "to": "79691936", "width": 1}, {"arrows": "to", "from": "68157465", "label": "Transaction count: 68", "to": "85983275", "width": 1}, {"arrows": "to", "from": "82837677", "label": "Transaction count: 7086", "to": "68157518", "width": 1}, {"arrows": "to", "from": "82837677", "label": "Transaction count: 6216", "to": "71303259", "width": 1}, {"arrows": "to", "from": "82837677", "label": "Transaction count: 188", "to": "71303307", "width": 1}, {"arrows": "to", "from": "82837677", "label": "Transaction count: 82", "to": "75497620", "width": 1}, {"arrows": "to", "from": "82837677", "label": "Transaction count: 76", "to": "78643356", "width": 1}, {"arrows": "to", "from": "82837677", "label": "Transaction count: 49", "to": "79691936", "width": 1}, {"arrows": "to", "from": "82837677", "label": "Transaction count: 36", "to": "82837652", "width": 1}, {"arrows": "to", "from": "82837677", "label": "Transaction count: 9695", "to": "82837677", "width": 1}, {"arrows": "to", "from": "82837677", "label": "Transaction count: 4127", "to": "87031896", "width": 1}, {"arrows": "to", "from": "82837677", "label": "Transaction count: 2977", "to": "84934794", "width": 1}, {"arrows": "to", "from": "82837677", "label": "Transaction count: 2485", "to": "88080500", "width": 1}, {"arrows": "to", "from": "82837677", "label": "Transaction count: 1447", "to": "88080428", "width": 1}, {"arrows": "to", "from": "82837677", "label": "Transaction count: 1197", "to": "96469034", "width": 1}, {"arrows": "to", "from": "82837677", "label": "Transaction count: 1167", "to": "87031918", "width": 1}, {"arrows": "to", "from": "82837677", "label": "Transaction count: 477", "to": "99614734", "width": 1}, {"arrows": "to", "from": "82837677", "label": "Transaction count: 461", "to": "98566211", "width": 1}, {"arrows": "to", "from": "82837677", "label": "Transaction count: 344", "to": "88080502", "width": 1}, {"arrows": "to", "from": "82837677", "label": "Transaction count: 178", "to": "92274784", "width": 1}, {"arrows": "to", "from": "82837677", "label": "Transaction count: 96", "to": "90177720", "width": 1}, {"arrows": "to", "from": "82837677", "label": "Transaction count: 98", "to": "87031900", "width": 1}, {"arrows": "to", "from": "82837677", "label": "Transaction count: 48", "to": "85983275", "width": 1}, {"arrows": "to", "from": "68157518", "label": "Transaction count: 5214", "to": "68157518", "width": 1}, {"arrows": "to", "from": "68157518", "label": "Transaction count: 4444", "to": "71303259", "width": 1}, {"arrows": "to", "from": "68157518", "label": "Transaction count: 3024", "to": "87031896", "width": 1}, {"arrows": "to", "from": "68157518", "label": "Transaction count: 2191", "to": "84934794", "width": 1}, {"arrows": "to", "from": "68157518", "label": "Transaction count: 1818", "to": "88080500", "width": 1}, {"arrows": "to", "from": "68157518", "label": "Transaction count: 1052", "to": "88080428", "width": 1}, {"arrows": "to", "from": "68157518", "label": "Transaction count: 901", "to": "87031918", "width": 1}, {"arrows": "to", "from": "68157518", "label": "Transaction count: 905", "to": "96469034", "width": 1}, {"arrows": "to", "from": "68157518", "label": "Transaction count: 303", "to": "98566211", "width": 1}, {"arrows": "to", "from": "68157518", "label": "Transaction count: 381", "to": "99614734", "width": 1}, {"arrows": "to", "from": "68157518", "label": "Transaction count: 241", "to": "88080502", "width": 1}, {"arrows": "to", "from": "68157518", "label": "Transaction count: 165", "to": "71303307", "width": 1}, {"arrows": "to", "from": "68157518", "label": "Transaction count: 134", "to": "92274784", "width": 1}, {"arrows": "to", "from": "68157518", "label": "Transaction count: 57", "to": "78643356", "width": 1}, {"arrows": "to", "from": "68157518", "label": "Transaction count: 61", "to": "87031900", "width": 1}, {"arrows": "to", "from": "68157518", "label": "Transaction count: 57", "to": "90177720", "width": 1}, {"arrows": "to", "from": "68157518", "label": "Transaction count: 54", "to": "75497620", "width": 1}, {"arrows": "to", "from": "68157518", "label": "Transaction count: 23", "to": "79691936", "width": 1}, {"arrows": "to", "from": "68157518", "label": "Transaction count: 31", "to": "85983275", "width": 1}, {"arrows": "to", "from": "68157518", "label": "Transaction count: 36", "to": "82837652", "width": 1}, {"arrows": "to", "from": "71303259", "label": "Transaction count: 4044", "to": "71303259", "width": 1}, {"arrows": "to", "from": "71303259", "label": "Transaction count: 2585", "to": "87031896", "width": 1}, {"arrows": "to", "from": "71303259", "label": "Transaction count: 1941", "to": "84934794", "width": 1}, {"arrows": "to", "from": "71303259", "label": "Transaction count: 1552", "to": "88080500", "width": 1}, {"arrows": "to", "from": "71303259", "label": "Transaction count: 943", "to": "88080428", "width": 1}, {"arrows": "to", "from": "71303259", "label": "Transaction count: 705", "to": "96469034", "width": 1}, {"arrows": "to", "from": "71303259", "label": "Transaction count: 678", "to": "87031918", "width": 1}, {"arrows": "to", "from": "71303259", "label": "Transaction count: 271", "to": "98566211", "width": 1}, {"arrows": "to", "from": "71303259", "label": "Transaction count: 299", "to": "99614734", "width": 1}, {"arrows": "to", "from": "71303259", "label": "Transaction count: 208", "to": "88080502", "width": 1}, {"arrows": "to", "from": "71303259", "label": "Transaction count: 116", "to": "71303307", "width": 1}, {"arrows": "to", "from": "71303259", "label": "Transaction count: 112", "to": "92274784", "width": 1}, {"arrows": "to", "from": "71303259", "label": "Transaction count: 48", "to": "87031900", "width": 1}, {"arrows": "to", "from": "71303259", "label": "Transaction count: 59", "to": "90177720", "width": 1}, {"arrows": "to", "from": "71303259", "label": "Transaction count: 60", "to": "75497620", "width": 1}, {"arrows": "to", "from": "71303259", "label": "Transaction count: 43", "to": "78643356", "width": 1}, {"arrows": "to", "from": "71303259", "label": "Transaction count: 24", "to": "85983275", "width": 1}, {"arrows": "to", "from": "71303259", "label": "Transaction count: 32", "to": "82837652", "width": 1}, {"arrows": "to", "from": "71303259", "label": "Transaction count: 23", "to": "79691936", "width": 1}, {"arrows": "to", "from": "87031896", "label": "Transaction count: 89", "to": "71303307", "width": 1}, {"arrows": "to", "from": "87031896", "label": "Transaction count: 31", "to": "75497620", "width": 1}, {"arrows": "to", "from": "87031896", "label": "Transaction count: 40", "to": "78643356", "width": 1}, {"arrows": "to", "from": "87031896", "label": "Transaction count: 14", "to": "79691936", "width": 1}, {"arrows": "to", "from": "87031896", "label": "Transaction count: 20", "to": "82837652", "width": 1}, {"arrows": "to", "from": "87031896", "label": "Transaction count: 1307", "to": "84934794", "width": 1}, {"arrows": "to", "from": "87031896", "label": "Transaction count: 19", "to": "85983275", "width": 1}, {"arrows": "to", "from": "87031896", "label": "Transaction count: 1789", "to": "87031896", "width": 1}, {"arrows": "to", "from": "87031896", "label": "Transaction count: 969", "to": "88080500", "width": 1}, {"arrows": "to", "from": "87031896", "label": "Transaction count: 628", "to": "88080428", "width": 1}, {"arrows": "to", "from": "87031896", "label": "Transaction count: 438", "to": "87031918", "width": 1}, {"arrows": "to", "from": "87031896", "label": "Transaction count: 474", "to": "96469034", "width": 1}, {"arrows": "to", "from": "87031896", "label": "Transaction count: 184", "to": "98566211", "width": 1}, {"arrows": "to", "from": "87031896", "label": "Transaction count: 208", "to": "99614734", "width": 1}, {"arrows": "to", "from": "87031896", "label": "Transaction count: 144", "to": "88080502", "width": 1}, {"arrows": "to", "from": "87031896", "label": "Transaction count: 68", "to": "92274784", "width": 1}, {"arrows": "to", "from": "87031896", "label": "Transaction count: 45", "to": "90177720", "width": 1}, {"arrows": "to", "from": "87031896", "label": "Transaction count: 33", "to": "87031900", "width": 1}, {"arrows": "to", "from": "88080500", "label": "Transaction count: 60", "to": "71303307", "width": 1}, {"arrows": "to", "from": "88080500", "label": "Transaction count: 16", "to": "75497620", "width": 1}, {"arrows": "to", "from": "88080500", "label": "Transaction count: 21", "to": "78643356", "width": 1}, {"arrows": "to", "from": "88080500", "label": "Transaction count: 7", "to": "79691936", "width": 1}, {"arrows": "to", "from": "88080500", "label": "Transaction count: 8", "to": "82837652", "width": 1}, {"arrows": "to", "from": "88080500", "label": "Transaction count: 807", "to": "84934794", "width": 1}, {"arrows": "to", "from": "88080500", "label": "Transaction count: 12", "to": "85983275", "width": 1}, {"arrows": "to", "from": "88080500", "label": "Transaction count: 16", "to": "87031900", "width": 1}, {"arrows": "to", "from": "88080500", "label": "Transaction count: 291", "to": "87031918", "width": 1}, {"arrows": "to", "from": "88080500", "label": "Transaction count: 360", "to": "88080428", "width": 1}, {"arrows": "to", "from": "88080500", "label": "Transaction count: 577", "to": "88080500", "width": 1}, {"arrows": "to", "from": "88080500", "label": "Transaction count: 300", "to": "96469034", "width": 1}, {"arrows": "to", "from": "88080500", "label": "Transaction count: 121", "to": "98566211", "width": 1}, {"arrows": "to", "from": "88080500", "label": "Transaction count: 127", "to": "99614734", "width": 1}, {"arrows": "to", "from": "88080500", "label": "Transaction count: 77", "to": "88080502", "width": 1}, {"arrows": "to", "from": "88080500", "label": "Transaction count: 44", "to": "92274784", "width": 1}, {"arrows": "to", "from": "88080500", "label": "Transaction count: 26", "to": "90177720", "width": 1}, {"arrows": "to", "from": "84934794", "label": "Transaction count: 66", "to": "71303307", "width": 1}, {"arrows": "to", "from": "84934794", "label": "Transaction count: 22", "to": "75497620", "width": 1}, {"arrows": "to", "from": "84934794", "label": "Transaction count: 26", "to": "78643356", "width": 1}, {"arrows": "to", "from": "84934794", "label": "Transaction count: 11", "to": "79691936", "width": 1}, {"arrows": "to", "from": "84934794", "label": "Transaction count: 12", "to": "82837652", "width": 1}, {"arrows": "to", "from": "84934794", "label": "Transaction count: 962", "to": "84934794", "width": 1}, {"arrows": "to", "from": "84934794", "label": "Transaction count: 462", "to": "88080428", "width": 1}, {"arrows": "to", "from": "84934794", "label": "Transaction count: 340", "to": "87031918", "width": 1}, {"arrows": "to", "from": "84934794", "label": "Transaction count: 363", "to": "96469034", "width": 1}, {"arrows": "to", "from": "84934794", "label": "Transaction count: 158", "to": "98566211", "width": 1}, {"arrows": "to", "from": "84934794", "label": "Transaction count: 149", "to": "99614734", "width": 1}, {"arrows": "to", "from": "84934794", "label": "Transaction count: 101", "to": "88080502", "width": 1}, {"arrows": "to", "from": "84934794", "label": "Transaction count: 56", "to": "92274784", "width": 1}, {"arrows": "to", "from": "84934794", "label": "Transaction count: 32", "to": "90177720", "width": 1}, {"arrows": "to", "from": "84934794", "label": "Transaction count: 16", "to": "87031900", "width": 1}, {"arrows": "to", "from": "84934794", "label": "Transaction count: 9", "to": "85983275", "width": 1}, {"arrows": "to", "from": "88080428", "label": "Transaction count: 31", "to": "71303307", "width": 1}, {"arrows": "to", "from": "88080428", "label": "Transaction count: 11", "to": "75497620", "width": 1}, {"arrows": "to", "from": "88080428", "label": "Transaction count: 15", "to": "78643356", "width": 1}, {"arrows": "to", "from": "88080428", "label": "Transaction count: 5", "to": "79691936", "width": 1}, {"arrows": "to", "from": "88080428", "label": "Transaction count: 7", "to": "82837652", "width": 1}, {"arrows": "to", "from": "88080428", "label": "Transaction count: 8", "to": "85983275", "width": 1}, {"arrows": "to", "from": "88080428", "label": "Transaction count: 7", "to": "87031900", "width": 1}, {"arrows": "to", "from": "88080428", "label": "Transaction count: 166", "to": "87031918", "width": 1}, {"arrows": "to", "from": "88080428", "label": "Transaction count: 230", "to": "88080428", "width": 1}, {"arrows": "to", "from": "88080428", "label": "Transaction count: 164", "to": "96469034", "width": 1}, {"arrows": "to", "from": "88080428", "label": "Transaction count: 66", "to": "99614734", "width": 1}, {"arrows": "to", "from": "88080428", "label": "Transaction count: 90", "to": "98566211", "width": 1}, {"arrows": "to", "from": "88080428", "label": "Transaction count: 35", "to": "88080502", "width": 1}, {"arrows": "to", "from": "88080428", "label": "Transaction count: 22", "to": "92274784", "width": 1}, {"arrows": "to", "from": "88080428", "label": "Transaction count: 13", "to": "90177720", "width": 1}, {"arrows": "to", "from": "87031918", "label": "Transaction count: 20", "to": "71303307", "width": 1}, {"arrows": "to", "from": "87031918", "label": "Transaction count: 7", "to": "75497620", "width": 1}, {"arrows": "to", "from": "87031918", "label": "Transaction count: 7", "to": "78643356", "width": 1}, {"arrows": "to", "from": "87031918", "label": "Transaction count: 9", "to": "79691936", "width": 1}, {"arrows": "to", "from": "87031918", "label": "Transaction count: 2", "to": "82837652", "width": 1}, {"arrows": "to", "from": "87031918", "label": "Transaction count: 3", "to": "85983275", "width": 1}, {"arrows": "to", "from": "87031918", "label": "Transaction count: 5", "to": "87031900", "width": 1}, {"arrows": "to", "from": "87031918", "label": "Transaction count: 135", "to": "96469034", "width": 1}, {"arrows": "to", "from": "87031918", "label": "Transaction count: 133", "to": "87031918", "width": 1}, {"arrows": "to", "from": "87031918", "label": "Transaction count: 46", "to": "99614734", "width": 1}, {"arrows": "to", "from": "87031918", "label": "Transaction count: 58", "to": "98566211", "width": 1}, {"arrows": "to", "from": "87031918", "label": "Transaction count: 33", "to": "88080502", "width": 1}, {"arrows": "to", "from": "87031918", "label": "Transaction count: 17", "to": "92274784", "width": 1}, {"arrows": "to", "from": "87031918", "label": "Transaction count: 11", "to": "90177720", "width": 1}, {"arrows": "to", "from": "96469034", "label": "Transaction count: 23", "to": "71303307", "width": 1}, {"arrows": "to", "from": "96469034", "label": "Transaction count: 9", "to": "75497620", "width": 1}, {"arrows": "to", "from": "96469034", "label": "Transaction count: 9", "to": "78643356", "width": 1}, {"arrows": "to", "from": "96469034", "label": "Transaction count: 2", "to": "79691936", "width": 1}, {"arrows": "to", "from": "96469034", "label": "Transaction count: 6", "to": "82837652", "width": 1}, {"arrows": "to", "from": "96469034", "label": "Transaction count: 2", "to": "85983275", "width": 1}, {"arrows": "to", "from": "96469034", "label": "Transaction count: 7", "to": "87031900", "width": 1}, {"arrows": "to", "from": "96469034", "label": "Transaction count: 48", "to": "88080502", "width": 1}, {"arrows": "to", "from": "96469034", "label": "Transaction count: 6", "to": "90177720", "width": 1}, {"arrows": "to", "from": "96469034", "label": "Transaction count: 16", "to": "92274784", "width": 1}, {"arrows": "to", "from": "96469034", "label": "Transaction count: 144", "to": "96469034", "width": 1}, {"arrows": "to", "from": "96469034", "label": "Transaction count: 51", "to": "99614734", "width": 1}, {"arrows": "to", "from": "96469034", "label": "Transaction count: 58", "to": "98566211", "width": 1}, {"arrows": "to", "from": "98566211", "label": "Transaction count: 9", "to": "71303307", "width": 1}, {"arrows": "to", "from": "98566211", "label": "Transaction count: 3", "to": "75497620", "width": 1}, {"arrows": "to", "from": "98566211", "label": "Transaction count: 6", "to": "78643356", "width": 1}, {"arrows": "to", "from": "98566211", "label": "Transaction count: 1", "to": "79691936", "width": 1}, {"arrows": "to", "from": "98566211", "label": "Transaction count: 1", "to": "85983275", "width": 1}, {"arrows": "to", "from": "98566211", "label": "Transaction count: 1", "to": "87031900", "width": 1}, {"arrows": "to", "from": "98566211", "label": "Transaction count: 12", "to": "88080502", "width": 1}, {"arrows": "to", "from": "98566211", "label": "Transaction count: 6", "to": "90177720", "width": 1}, {"arrows": "to", "from": "98566211", "label": "Transaction count: 13", "to": "92274784", "width": 1}, {"arrows": "to", "from": "98566211", "label": "Transaction count: 25", "to": "99614734", "width": 1}, {"arrows": "to", "from": "98566211", "label": "Transaction count: 22", "to": "98566211", "width": 1}, {"arrows": "to", "from": "98566211", "label": "Transaction count: 2", "to": "82837652", "width": 1}, {"arrows": "to", "from": "99614734", "label": "Transaction count: 11", "to": "71303307", "width": 1}, {"arrows": "to", "from": "99614734", "label": "Transaction count: 5", "to": "75497620", "width": 1}, {"arrows": "to", "from": "99614734", "label": "Transaction count: 1", "to": "78643356", "width": 1}, {"arrows": "to", "from": "99614734", "label": "Transaction count: 4", "to": "79691936", "width": 1}, {"arrows": "to", "from": "99614734", "label": "Transaction count: 5", "to": "82837652", "width": 1}, {"arrows": "to", "from": "99614734", "label": "Transaction count: 1", "to": "85983275", "width": 1}, {"arrows": "to", "from": "99614734", "label": "Transaction count: 3", "to": "87031900", "width": 1}, {"arrows": "to", "from": "99614734", "label": "Transaction count: 25", "to": "88080502", "width": 1}, {"arrows": "to", "from": "99614734", "label": "Transaction count: 3", "to": "90177720", "width": 1}, {"arrows": "to", "from": "99614734", "label": "Transaction count: 9", "to": "92274784", "width": 1}, {"arrows": "to", "from": "99614734", "label": "Transaction count: 26", "to": "99614734", "width": 1}, {"arrows": "to", "from": "88080502", "label": "Transaction count: 10", "to": "71303307", "width": 1}, {"arrows": "to", "from": "88080502", "label": "Transaction count: 2", "to": "75497620", "width": 1}, {"arrows": "to", "from": "88080502", "label": "Transaction count: 7", "to": "78643356", "width": 1}, {"arrows": "to", "from": "88080502", "label": "Transaction count: 3", "to": "79691936", "width": 1}, {"arrows": "to", "from": "88080502", "label": "Transaction count: 3", "to": "85983275", "width": 1}, {"arrows": "to", "from": "88080502", "label": "Transaction count: 3", "to": "87031900", "width": 1}, {"arrows": "to", "from": "88080502", "label": "Transaction count: 11", "to": "88080502", "width": 1}, {"arrows": "to", "from": "88080502", "label": "Transaction count: 4", "to": "92274784", "width": 1}, {"arrows": "to", "from": "88080502", "label": "Transaction count: 1", "to": "82837652", "width": 1}, {"arrows": "to", "from": "88080502", "label": "Transaction count: 1", "to": "90177720", "width": 1}, {"arrows": "to", "from": "71303307", "label": "Transaction count: 7", "to": "71303307", "width": 1}, {"arrows": "to", "from": "71303307", "label": "Transaction count: 5", "to": "92274784", "width": 1}, {"arrows": "to", "from": "71303307", "label": "Transaction count: 3", "to": "87031900", "width": 1}, {"arrows": "to", "from": "71303307", "label": "Transaction count: 2", "to": "82837652", "width": 1}, {"arrows": "to", "from": "71303307", "label": "Transaction count: 4", "to": "90177720", "width": 1}, {"arrows": "to", "from": "71303307", "label": "Transaction count: 1", "to": "78643356", "width": 1}, {"arrows": "to", "from": "92274784", "label": "Transaction count: 1", "to": "78643356", "width": 1}, {"arrows": "to", "from": "92274784", "label": "Transaction count: 3", "to": "82837652", "width": 1}, {"arrows": "to", "from": "92274784", "label": "Transaction count: 1", "to": "85983275", "width": 1}, {"arrows": "to", "from": "92274784", "label": "Transaction count: 1", "to": "87031900", "width": 1}, {"arrows": "to", "from": "92274784", "label": "Transaction count: 1", "to": "90177720", "width": 1}, {"arrows": "to", "from": "92274784", "label": "Transaction count: 4", "to": "92274784", "width": 1}, {"arrows": "to", "from": "92274784", "label": "Transaction count: 1", "to": "75497620", "width": 1}, {"arrows": "to", "from": "87031900", "label": "Transaction count: 1", "to": "75497620", "width": 1}, {"arrows": "to", "from": "87031900", "label": "Transaction count: 1", "to": "78643356", "width": 1}, {"arrows": "to", "from": "87031900", "label": "Transaction count: 2", "to": "79691936", "width": 1}, {"arrows": "to", "from": "87031900", "label": "Transaction count: 1", "to": "85983275", "width": 1}, {"arrows": "to", "from": "87031900", "label": "Transaction count: 1", "to": "90177720", "width": 1}, {"arrows": "to", "from": "79691936", "label": "Transaction count: 2", "to": "78643356", "width": 1}, {"arrows": "to", "from": "79691936", "label": "Transaction count: 1", "to": "82837652", "width": 1}, {"arrows": "to", "from": "75497620", "label": "Transaction count: 1", "to": "75497620", "width": 1}, {"arrows": "to", "from": "75497620", "label": "Transaction count: 1", "to": "78643356", "width": 1}, {"arrows": "to", "from": "75497620", "label": "Transaction count: 3", "to": "90177720", "width": 1}, {"arrows": "to", "from": "82837652", "label": "Transaction count: 1", "to": "78643356", "width": 1}, {"arrows": "to", "from": "78643356", "label": "Transaction count: 2", "to": "78643356", "width": 1}, {"arrows": "to", "from": "78643356", "label": "Transaction count: 1", "to": "90177720", "width": 1}, {"arrows": "to", "from": "78643356", "label": "Transaction count: 1", "to": "85983275", "width": 1}, {"arrows": "to", "from": "85983275", "label": "Transaction count: 1", "to": "85983275", "width": 1}]);
+
+                  nodeColors = {};
+                  allNodes = nodes.get({ returnType: "Object" });
+                  for (nodeId in allNodes) {
+                    nodeColors[nodeId] = allNodes[nodeId].color;
+                  }
+                  allEdges = edges.get({ returnType: "Object" });
+                  // adding nodes and edges to the graph
+                  data = {nodes: nodes, edges: edges};
+
+                  var options = {"physics": {"forceAtlas2Based": {"springLength": 0, "springConstant": 0}, "minVelocity": 0.75, "solver": "forceAtlas2Based"}};
+
+                  
+
+
+                  
+
+                  network = new vis.Network(container, data, options);
+
+                  
+
+                  
+
+                  
+
+
+                  
+
+                  return network;
+
+              }
+              drawGraph();
+        </script>
+    </body>
+</html>
